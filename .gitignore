@@ -1,0 +1,32 @@
+# 环境变量文件（敏感数据）
+.env
+
+# Secrets
+secrets/
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# 日志
+*.log
+logs/
+
+# 数据库
+*.db
+*.sqlite
+
+# Docker
+docker-compose.override.yml
+
+# 临时文件
+tmp/
+temp/
