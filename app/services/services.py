@@ -236,3 +236,224 @@ def set_item_state(
         session.commit()
         # 更新统计
         sync_item_counts(session, item.father)
+
+#实现飞书机器人的命令行接口（还未实现qaq）
+# --- 命令处理功能 ---
+def handle_command(session: Session, user_id: str, command: str, sender_id: dict = None) -> str:
+    """
+    处理命令
+    :param session: 数据库会话
+    :param user_id: 用户ID
+    :param command: 命令字符串
+    :param sender_id: 发送者ID信息
+    :return: 处理结果
+    """
+    import re
+    
+    if not command.startswith('/'):
+        return None  # 不是命令，返回None
+    
+    # 命令映射
+    command_map = {
+        'help': _handle_help_command,
+        'add': _handle_add_command,
+        'del': _handle_del_command,
+        'search': _handle_search_command,
+        'return': _handle_return_command,
+    }
+    
+    # 解析命令
+    parts = command.strip().split()
+    if len(parts) < 1:
+        return "Error: 无效的命令格式"
+    
+    cmd = parts[0][1:]  # 去掉开头的'/'
+    if cmd not in command_map:
+        return f"Error: 未知命令 '{cmd}'，输入 /help 查看帮助"
+    
+    # 检查权限
+    member = session.get(Member, user_id)
+    if not member:
+        return "Error: 用户不存在"
+    
+    # 特定命令需要管理员权限
+    admin_commands = ['add', 'del']
+    if cmd in admin_commands and member.root != 1:
+        return "Error: 权限不足"
+    
+    # 执行命令
+    try:
+        return command_map[cmd](session, user_id, parts[1:], member)
+    except Exception as e:
+        return f"Error: 命令执行失败 - {str(e)}"
+
+
+def _handle_help_command(session: Session, user_id: str, params: list, member: Member) -> str:
+    """处理帮助命令"""
+    help_text = (
+        "机器人命令指南：\n"
+        "/help - 查看帮助\n"
+        "/search <id> - 搜索ID对应的项\n"
+        "/return <id> - 归还ID对应的物品\n"
+        "管理员命令：\n"
+        "/add <item|list|category> [params] - 添加数据\n"
+        "/del <item|list|category> [params] - 删除数据\n"
+    )
+    return help_text
+
+
+def _handle_add_command(session: Session, user_id: str, params: list, member: Member) -> str:
+    """处理添加命令"""
+    if len(params) < 2:
+        return "Error: 参数不足，格式: /add <item|list|category> [params]"
+    
+    obj_type = params[0]
+    if obj_type not in ['item', 'list', 'category']:
+        return "Error: 对象类型错误，应为 item|list|category"
+    
+    # 这里需要根据具体参数实现添加逻辑
+    # 暂时返回提示信息
+    return f"Info: 添加 {obj_type} 功能待实现"
+
+
+def _handle_del_command(session: Session, user_id: str, params: list, member: Member) -> str:
+    """处理删除命令"""
+    if len(params) < 2:
+        return "Error: 参数不足，格式: /del <item|list|category> [params]"
+    
+    obj_type = params[0]
+    if obj_type not in ['item', 'list', 'category']:
+        return "Error: 对象类型错误，应为 item|list|category"
+    
+    # 这里需要根据具体参数实现删除逻辑
+    # 暂时返回提示信息
+    return f"Info: 删除 {obj_type} 功能待实现"
+
+
+def _handle_search_command(session: Session, user_id: str, params: list, member: Member) -> str:
+    """处理搜索命令"""
+    if len(params) < 1:
+        return "Error: 请提供要搜索的ID，格式: /search <id>"
+    
+    try:
+        obj_id = int(params[0])
+        # 这里需要根据ID类型返回相应信息
+        # 暂时返回提示信息
+        return f"Info: 搜索ID {obj_id} 功能待实现"
+    except ValueError:
+        return "Error: ID必须是数字"
+
+
+def _handle_return_command(session: Session, user_id: str, params: list, member: Member) -> str:
+    """处理归还命令"""
+    if len(params) < 1:
+        return "Error: 请提供要归还的物品ID，格式: /return <id>"
+    
+    try:
+        obj_id = int(params[0])
+        result = return_item(session, obj_id, user_id)
+        return result
+    except ValueError:
+        return "Error: 物品ID必须是数字"
+
+
+# --- 飞书服务功能 ---
+def send_message_to_user(user_id: str, message: str, id_type: str = "open_id"):
+    """
+    发送消息给指定用户
+    :param user_id: 用户ID
+    :param message: 消息内容
+    :param id_type: ID类型，默认为open_id
+    :return: 消息发送结果
+    """
+    try:
+        from app.core.feishu import send_text_message
+        result = send_text_message(user_id, message, id_type)
+        return result
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"发送消息失败: {e}")
+        return None
+
+
+def send_notification_to_group(chat_id: str, message: str):
+    """
+    发送通知到群组
+    :param chat_id: 群组ID
+    :param message: 消息内容
+    :return: 消息发送结果
+    """
+    try:
+        from app.core.feishu import send_text_message
+        result = send_text_message(chat_id, message, "chat_id")
+        return result
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"发送群组消息失败: {e}")
+        return None
+
+
+def get_user_info(user_id: str, id_type: str = "open_id"):
+    """
+    获取用户信息
+    :param user_id: 用户ID
+    :param id_type: ID类型
+    :return: 用户信息
+    """
+    try:
+        from app.core.feishu import api_client
+        from lark_oapi.api.im.v1 import GetUserRequest
+        request = GetUserRequest.builder() \
+            .user_id_type(id_type) \
+            .user_id(user_id) \
+            .build()
+
+        response = api_client.contact.v3.user.get(request)
+
+        if response.success():
+            return response.data.user
+        else:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"获取用户信息失败: {response.code}, {response.msg}")
+            return None
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"获取用户信息异常: {e}")
+        return None
+
+
+def create_group_chat(user_ids: list, name: str = ""):
+    """
+    创建群聊
+    :param user_ids: 用户ID列表
+    :param name: 群聊名称
+    :return: 群聊信息
+    """
+    try:
+        from app.core.feishu import api_client
+        from lark_oapi.api.im.v1 import CreateChatRequest, CreateChatRequestBody
+        request_body = CreateChatRequestBody.builder() \
+            .name(name) \
+            .user_ids(user_ids) \
+            .build()
+
+        request = CreateChatRequest.builder().request_body(request_body).build()
+
+        response = api_client.im.v1.chat.create(request)
+
+        if response.success():
+            return response.data.chat
+        else:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"创建群聊失败: {response.code}, {response.msg}")
+            return None
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"创建群聊异常: {e}")
+        return None

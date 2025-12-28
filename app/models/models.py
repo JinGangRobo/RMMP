@@ -97,3 +97,4 @@ class Log(SQLModel, table=True):
     operation: str
     object: Optional[int] = Field(default=None)
     do: Optional[str] = Field(default="")
+

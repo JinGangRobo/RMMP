@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     SQL_LOG_LEVEL: str = "INFO"
 
     # 服务器配置
-    HOST: str = "0.0.0.0"
+    HOST: str = "127.0.0.10"
     PORT: int = 8080
 
     DB_SERVER: str = ""
